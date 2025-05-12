@@ -1,0 +1,15 @@
+{
+  "name": "户外轨迹记录 —— 快速、简洁记录你的轨变",
+  "short_name": "轨迹记录",
+  "icons": [
+    {
+      "src": "/favicon/favicon.png",
+      "type": "image/x-icon",
+      "sizes": "16x16 32x32 140x140"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ff6600"
+}
