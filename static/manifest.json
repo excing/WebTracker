@@ -3,9 +3,9 @@
   "short_name": "轨迹记录",
   "icons": [
     {
-      "src": "/favicon/favicon.png",
+      "src": "/favicon/web/icon-192.png",
       "type": "image/x-icon",
-      "sizes": "16x16 32x32 140x140"
+      "sizes": "16x16 32x32 140x140 192x192"
     }
   ],
   "start_url": "/",
