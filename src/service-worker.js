@@ -1,70 +1,89 @@
-const CACHE_NAME = 'outdoor-tracking-app-v1';
-const urlsToCache = [
-  '/',
-  'https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css',
-  'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.3/leaflet.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.3/leaflet.css',
-  'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.3/images/marker-icon.png',
-  'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.3/images/marker-shadow.png'
+/// <reference types="@sveltejs/kit" />
+import { build, files, version } from '$service-worker';
+
+// Create a unique cache name for this deployment
+const CACHE = `cache-${version}`;
+
+const ASSETS = [
+  ...build, // the app itself
+  ...files  // everything in `static`
 ];
 
-// 安装 Service Worker
-self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('Opened cache');
-        return cache.addAll(urlsToCache);
-      })
-  );
+self.addEventListener('install', (event) => {
+  console.log(`install service worker version: ${version}`);
+
+  // Create a new cache and add all files to it
+  async function addFilesToCache() {
+    const cache = await caches.open(CACHE);
+    await cache.addAll(ASSETS);
+  }
+
+  event.waitUntil(addFilesToCache());
 });
 
-// 激活 Service Worker
-self.addEventListener('activate', event => {
-  const cacheWhitelist = [CACHE_NAME];
-  event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheWhitelist.indexOf(cacheName) === -1) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
-  );
+self.addEventListener('activate', (event) => {
+  console.log(`activate service worker version: ${version}`);
+
+  // Remove previous cached data from disk
+  async function deleteOldCaches() {
+    for (const key of await caches.keys()) {
+      if (key !== CACHE) await caches.delete(key);
+    }
+  }
+
+  event.waitUntil(deleteOldCaches());
 });
 
-// 拦截请求
-self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        // 如果缓存中存在请求的资源，则返回缓存的资源
-        if (response) {
-          return response;
-        }
+self.addEventListener('fetch', (event) => {
+  // 过滤掉 chrome-extension 协议的请求
+  // 当你在 Service Worker 中遇到 Uncaught (in promise) TypeError: Failed to execute 'put' on 'Cache': Request scheme 'chrome-extension' is unsupported 错误时，这通常是因为 Service Worker 尝试缓存来自 Chrome 扩展（chrome-extension 协议）的资源，但 Cache API 不支持这种协议的请求。
+  if (event.request.url.startsWith('chrome-extension:')) {
+    return;
+  }
+  // ignore POST requests etc
+  if (event.request.method !== 'GET') return;
 
-        // 否则，发起网络请求
-        return fetch(event.request).then(
-          response => {
-            // 检查响应是否有效
-            if (!response || response.status !== 200 || response.type !== 'basic') {
-              return response;
-            }
+  async function respond() {
+    const url = new URL(event.request.url);
+    const cache = await caches.open(CACHE);
 
-            // 克隆响应，因为响应是流，只能使用一次
-            const responseToCache = response.clone();
+    // `build`/`files` can always be served from the cache
+    if (ASSETS.includes(url.pathname)) {
+      const response = await cache.match(url.pathname);
 
-            // 将响应添加到缓存
-            caches.open(CACHE_NAME)
-              .then(cache => {
-                cache.put(event.request, responseToCache);
-              });
+      if (response) {
+        return response;
+      }
+    }
 
-            return response;
-          }
-        );
-      })
-  );
+    // for everything else, try the network first, but
+    // fall back to the cache if we're offline
+    try {
+      const response = await fetch(event.request);
+
+      // if we're offline, fetch can return a value that is not a Response
+      // instead of throwing - and we can't pass this non-Response to respondWith
+      if (!(response instanceof Response)) {
+        throw new Error('invalid response from fetch');
+      }
+
+      if (response.status === 200) {
+        cache.put(event.request, response.clone());
+      }
+
+      return response;
+    } catch (err) {
+      const response = await cache.match(event.request);
+
+      if (response) {
+        return response;
+      }
+
+      // if there's no cache, then just error out
+      // as there is nothing we can do to respond to this request
+      throw err;
+    }
+  }
+
+  event.respondWith(respond());
 });
