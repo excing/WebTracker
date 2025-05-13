@@ -203,7 +203,7 @@
   }
 </script>
 
-<main class="h-screen w-full flex flex-col bg-gray-100">
+<main class="h-dvh w-full flex flex-col bg-gray-100">
   {#if isRecording}
     <!-- 记录模式 -->
     <div class="p-4 bg-green-500 text-white flex justify-between items-center">

@@ -1,10 +1,6 @@
 const CACHE_NAME = 'outdoor-tracking-app-v1';
 const urlsToCache = [
   '/',
-  '/index.html',
-  '/global.css',
-  '/build/bundle.css',
-  '/build/bundle.js',
   'https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.3/leaflet.js',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.3/leaflet.css',
