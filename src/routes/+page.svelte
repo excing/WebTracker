@@ -98,7 +98,7 @@
         },
         { enableHighAccuracy: true },
       );
-    }, 60000); // 每分钟记录一次
+    }, 10000); // 每分钟记录一次
 
     // 立即记录第一个点
     navigator.geolocation.getCurrentPosition(
@@ -197,7 +197,7 @@
     let bearing = toDeg(Math.atan2(y, x));
 
     // 转换为0-360度范围
-    bearing = (bearing + 360) % 360;
+    bearing = (bearing + 270) % 360;
 
     return bearing;
   }
