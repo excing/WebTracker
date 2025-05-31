@@ -127,7 +127,14 @@
         if (audio instanceof Audio) {
           audio.src = url;
           audio.volume = 0.05;
-          audio.play();
+          audio
+            .play()
+            .then(() => {
+              alert("自动播放成功");
+            })
+            .catch((error) => {
+              alert(error.message);
+            });
           audio.onended = () => {
             // console.log("play ended");
             audio.play();
@@ -136,6 +143,7 @@
         }
       })
       .catch(() => {
+        alert("无法后台记录");
         // 每分钟记录一次位置
         watchId = setInterval(() => {
           recordTrack();
