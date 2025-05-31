@@ -42,9 +42,8 @@
     const savedTracks = localStorage.getItem("tracks");
     if (savedTracks) {
       tracks = JSON.parse(savedTracks);
-
-      recordTrack();
     }
+    recordTrack();
   });
 
   function recordTrack() {
