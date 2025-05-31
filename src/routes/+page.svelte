@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { browser } from "$app/environment";
+  import { browser, dev } from "$app/environment";
   import Map from "$lib/components/Map.svelte";
   import TrackList from "$lib/components/TrackList.svelte";
   import type { Position, Track } from "$lib/types";
@@ -271,7 +271,9 @@
   {:else}
     <!-- 非记录模式 -->
     <div class="p-4 bg-blue-500 text-white">
-      <h1 class="text-2xl font-bold">户外轨迹记录</h1>
+      <h1 class="text-2xl font-bold">
+        户外轨迹记录 <span class="text-sm">({dev ? "Dev" : "Beta"})</span>
+      </h1>
     </div>
 
     <!-- 开始记录按钮 -->
