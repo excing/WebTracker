@@ -1,13 +1,13 @@
 <script lang="ts">
+  import { browser } from "$app/environment";
   import Map from "$lib/components/Map.svelte";
   import TrackList from "$lib/components/TrackList.svelte";
   import type { Position, Track } from "$lib/types";
   import { formatDate } from "$lib/utils";
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
 
   let isRecording = false;
   let tracks: Track[] = [];
-  let currentTrack: Track | null = null;
   let map: any;
   let watchId: number | null = null;
   let importedTracks: Track[] = [];
@@ -26,81 +26,28 @@
 
   // 当前正在记录的位置列表
   let currentPositions: Position[] = [];
+  let audio: any = null;
+
+  $: {
+    if (browser && 0 < tracks.length) {
+      // console.log("tracks changed");
+
+      localStorage.setItem("tracks", JSON.stringify(tracks));
+    }
+  }
 
   onMount(() => {
     // 从localStorage加载保存的轨迹
+    // console.log("tracks init");
     const savedTracks = localStorage.getItem("tracks");
     if (savedTracks) {
       tracks = JSON.parse(savedTracks);
+
+      recordTrack();
     }
   });
 
-  function startRecording() {
-    if (!navigator.geolocation) {
-      alert("您的浏览器不支持地理位置功能");
-      return;
-    }
-
-    isRecording = true;
-    currentPositions = [];
-
-    const startTime = new Date();
-    currentTrack = {
-      id: Date.now().toString(),
-      name: `轨迹 ${formatDate(startTime)}`,
-      startTime: startTime.toISOString(),
-      endTime: "",
-      positions: [],
-    };
-
-    // 每分钟记录一次位置
-    watchId = setInterval(() => {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const newPosition: Position = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            altitude: position.coords.altitude || 0,
-            timestamp: new Date().toISOString(),
-            direction: 0, // 初始方向为0，后面会计算
-          };
-
-          currentPositions = [...currentPositions, newPosition];
-
-          // 计算方向 (如果有两个以上的点)
-          if (currentPositions.length > 1) {
-            const prevPos = currentPositions[currentPositions.length - 2];
-            const currPos = currentPositions[currentPositions.length - 1];
-
-            // 计算两点之间的方向角度
-            const direction = calculateDirection(
-              prevPos.latitude,
-              prevPos.longitude,
-              currPos.latitude,
-              currPos.longitude,
-            );
-
-            newPosition.direction = direction;
-            currentPositions[currentPositions.length - 1] = newPosition;
-          }
-
-          if (currentTrack) {
-            currentTrack.positions = [...currentPositions];
-          }
-
-          // 更新地图显示
-          if (map) {
-            map.updateCurrentTrack(currentPositions);
-          }
-        },
-        (error) => {
-          console.error("获取位置信息失败:", error);
-        },
-        { enableHighAccuracy: true },
-      );
-    }, 10000); // 每分钟记录一次
-
-    // 立即记录第一个点
+  function recordTrack() {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const newPosition: Position = {
@@ -108,13 +55,31 @@
           longitude: position.coords.longitude,
           altitude: position.coords.altitude || 0,
           timestamp: new Date().toISOString(),
-          direction: 0,
+          direction: 0, // 初始方向为0，后面会计算
         };
+        // console.log(newPosition);
 
-        currentPositions = [newPosition];
+        // 计算方向 (如果有两个以上的点)
+        if (currentPositions.length >= 1) {
+          const prevPos = currentPositions[currentPositions.length - 1];
+          const currPos = newPosition;
 
-        if (currentTrack) {
-          currentTrack.positions = [newPosition];
+          // 计算两点之间的方向角度
+          const direction = calculateDirection(
+            prevPos.latitude,
+            prevPos.longitude,
+            currPos.latitude,
+            currPos.longitude,
+          );
+
+          newPosition.direction = direction;
+        }
+
+        currentPositions = [...currentPositions, newPosition];
+
+        if (isRecording && tracks && 0 < tracks.length) {
+          tracks[tracks.length - 1].positions = [...currentPositions];
+          tracks[tracks.length - 1].endTime = new Date().toISOString();
         }
 
         // 更新地图显示
@@ -129,23 +94,76 @@
     );
   }
 
+  function startRecording() {
+    if (!navigator.geolocation) {
+      alert("您的浏览器不支持地理位置功能");
+      throw new Error("");
+    }
+
+    isRecording = true;
+    currentPositions = [];
+
+    const startTime = new Date();
+    tracks = [
+      ...tracks,
+      {
+        id: Date.now().toString(),
+        name: `轨迹 ${formatDate(startTime)}`,
+        startTime: startTime.toISOString(),
+        endTime: new Date().toISOString(),
+        positions: [],
+      },
+    ];
+
+    // 立即记录
+    recordTrack();
+
+    fetch("/clock-noise-188047.mp3")
+      .then((resp) => resp.blob())
+      .then((blob) => URL.createObjectURL(blob))
+      .then((url) => {
+        if (!audio) {
+          audio = new Audio();
+        }
+        if (audio instanceof Audio) {
+          audio.src = url;
+          audio.volume = 0.05;
+          audio.play();
+          audio.onended = () => {
+            // console.log("play ended");
+            audio.play();
+            recordTrack();
+          };
+        }
+      })
+      .catch(() => {
+        // 每分钟记录一次位置
+        watchId = setInterval(() => {
+          recordTrack();
+        }, 15000); // 每15s记录一次
+      });
+  }
+
   function stopRecording() {
     if (watchId !== null) {
       clearInterval(watchId);
       watchId = null;
     }
 
-    if (currentTrack && currentPositions.length > 0) {
-      currentTrack.endTime = new Date().toISOString();
-      currentTrack.positions = [...currentPositions];
-
-      // 保存轨迹
-      tracks = [...tracks, currentTrack];
-      localStorage.setItem("tracks", JSON.stringify(tracks));
+    if (audio && audio instanceof Audio && !audio.paused) {
+      audio.pause();
     }
 
+    // if (currentTrack && currentPositions.length > 0) {
+    //   currentTrack.endTime = new Date().toISOString();
+    //   currentTrack.positions = [...currentPositions];
+
+    //   // 保存轨迹
+    //   tracks = [...tracks, currentTrack];
+    //   localStorage.setItem("tracks", JSON.stringify(tracks));
+    // }
+
     isRecording = false;
-    currentTrack = null;
     currentPositions = [];
     importedTracks = [];
   }
@@ -201,6 +219,13 @@
 
     return bearing;
   }
+
+  onDestroy(() => {
+    if (audio && audio instanceof Audio) {
+      audio.pause();
+    }
+    audio = null;
+  });
 </script>
 
 <main class="h-dvh w-full flex flex-col bg-gray-100">
@@ -216,7 +241,7 @@
       </button>
     </div>
 
-    <div class="flex-1 w-full">
+    <div class="flex-3 w-full">
       <Map
         on:init={handleMapInit}
         {currentPositions}
@@ -226,7 +251,7 @@
 
     <!-- 导入轨迹选项 -->
     {#if isRecording}
-      <div class="p-4 bg-white shadow-md">
+      <div class="flex-1 overflow-y-auto p-4 bg-white shadow-md">
         <h2 class="text-lg font-semibold mb-2">导入轨迹</h2>
         <TrackList
           {tracks}

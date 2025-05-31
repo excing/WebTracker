@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, createEventDispatcher } from "svelte";
+  import { dev } from "$app/environment";
   import type { Track, Position } from "../types";
 
   export let currentPositions: Position[] = [];
@@ -43,10 +44,15 @@
     // 初始化地图
     map = L.map(mapContainer).setView([39.9042, 116.4074], 13); // 默认北京中心
 
-    L.tileLayer("/api/tile?s={s}&x={x}&y={y}&z={z}", {
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    }).addTo(map);
+    L.tileLayer(
+      dev
+        ? "https://huw.blendiv.com/api/tile?s={s}&x={x}&y={y}&z={z}"
+        : "/api/tile?s={s}&x={x}&y={y}&z={z}",
+      {
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      },
+    ).addTo(map);
 
     mapLoaded = true;
 
